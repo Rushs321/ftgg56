@@ -75,7 +75,9 @@ export async function processRequest(request, reply) {
         if (checkCompression(request)) {
             return applyCompression(request, reply, buffer);
         } else {
-            return performBypass(request, reply, buffer);
+            // Directly pipe the response stream to the client
+            reply.header('content-length', request.params.originSize);
+            return response.body.pipe(reply.raw);
         }
     } catch (err) {
         return handleRedirect(request, reply);
