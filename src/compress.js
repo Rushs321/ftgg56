@@ -1,32 +1,24 @@
-import sharp from'sharp';
-import {redirect} from './redirect.js';
+import sharp from 'sharp';
+import { redirect } from './redirect.js';
 
 export async function compressImg(request, reply, imgStream) {
-    const { webp, grayscale, quality, originSize } = request.params;
-    const imgFormat = webp ? 'webp' : 'jpeg';
+    const imgFormat = request.params.webp ? 'webp' : 'jpeg';
+    const grayscale = Boolean(request.params.grayscale);
+    const quality = request.params.quality;
+    const originSize = request.params.originSize;
 
     try {
-        // Create the sharp instance and start the pipeline
-        const sharpStream = sharp()
-            .grayscale(grayscale) // Apply grayscale conditionally
+        // Create a Sharp instance that processes the stream
+        const { data, info } = await sharp(imgStream)
+            .grayscale(grayscale)
             .toFormat(imgFormat, {
-                quality, // Use the provided quality
+                quality,
                 progressive: true,
-                optimizeScans: webp, // Optimize scans only for WebP
-                chromaSubsampling: webp ? '4:4:4' : '4:2:0', // Conditional chroma subsampling
-            });
+                optimizeScans: true,
+                chromaSubsampling: '4:4:4',
+            })
+            .toBuffer({ resolveWithObject: true });
 
-        // Pipe the input stream through the sharp instance
-        const { data, info } = await new Promise((resolve, reject) => {
-            const buffers = [];
-            imgStream.pipe(sharpStream)
-                .on('data', chunk => buffers.push(chunk))
-                .on('end', () => resolve(Buffer.concat(buffers)))
-                .on('info', resolve)
-                .on('error', reject);
-        });
-
-        // Send response with appropriate headers
         reply
             .header('content-type', `image/${imgFormat}`)
             .header('content-length', info.size)
@@ -38,3 +30,4 @@ export async function compressImg(request, reply, imgStream) {
         return redirect(request, reply);
     }
 }
+
